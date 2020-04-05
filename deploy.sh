@@ -29,7 +29,9 @@ function deploy_WP_LEMP() {
 
 # Test pods for liveness probe success
 function test_probe_results() {
+  echo -n "Waiting for all pods to be ready... "
   kubectl wait --for=condition=Ready pods --all
+  echo "done."
   echo -n "Waiting 10 seconds for next liveness round of testing... "
   sleep 10
   count=$(kubectl describe pods | grep -E "Liveness|#success=1" | wc -l)
@@ -37,7 +39,26 @@ function test_probe_results() {
     echo "succeeded."
   else
     echo "failed - expecting 6 records for liveness and readiness probes"
+    exit 1
   fi
+}
+
+function setup_hpa() {
+  # Install metrics server
+  DOWNLOAD_URL=$(curl -Ls "https://api.github.com/repos/kubernetes-sigs/metrics-server/releases/latest" | jq -r .tarball_url)
+  DOWNLOAD_VERSION=$(grep -o '[^/v]*$' <<< $DOWNLOAD_URL)
+  curl -Ls $DOWNLOAD_URL -o metrics-server-$DOWNLOAD_VERSION.tar.gz
+  mkdir metrics-server-$DOWNLOAD_VERSION
+  tar -xzf metrics-server-$DOWNLOAD_VERSION.tar.gz --directory metrics-server-$DOWNLOAD_VERSION --strip-components 1
+  kubectl apply -f metrics-server-$DOWNLOAD_VERSION/deploy/1.8+/
+
+  # Verify that EKS metrics-server is deployed
+  kubectl get deployment metrics-server -n kube-system
+  # Create a simple HPA for the wordpress deployment
+  kubectl autoscale deployment wordpress --cpu-percent=50 --min=1 --max=10
+  kubectl get hpa
+
+  # TODO test it?
 }
 
 cat << EOF
@@ -47,6 +68,7 @@ Starting Wordpress LEMP EKS deployment
 
 EOF
 
-#create_EKS_cluster
-#deploy_WP_LEMP
+create_EKS_cluster
+deploy_WP_LEMP
 test_probe_results
+setup_hpa

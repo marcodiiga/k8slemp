@@ -68,13 +68,13 @@ spec:
           httpGet:
             path: /
             port: 80
-          initialDelaySeconds: 10
+          initialDelaySeconds: 60
           periodSeconds: 10
         readinessProbe: # Check if ready to accept requests
           httpGet:
             path: /
             port: 80
-          initialDelaySeconds: 10
+          initialDelaySeconds: 60
           periodSeconds: 10
         ports:
         - containerPort: 80
